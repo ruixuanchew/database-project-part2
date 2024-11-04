@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Dashboard - Foody</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta content="Dashboard" name="description">
+
+    <!-- Google Web Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500&family=Lora:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Icon Font Stylesheet -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Bootstrap Stylesheet -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom Stylesheet -->
+    <link href="css/style.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Navbar Start -->
+    <nav class="navbar navbar-expand-lg navbar-light py-lg-0 px-lg-5 wow fadeIn" data-wow-delay="0.1s">
+        <a href="recipes.html" class="navbar-brand ms-4 ms-lg-0">
+            <h1 class="fw-bold text-primary m-0">F<span class="text-secondary">oo</span>dy</h1>
+        </a>
+        <button type="button" class="navbar-toggler me-4" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarCollapse">
+            <div class="navbar-nav ms-auto p-4 p-lg-0">
+                <a href="recipes.html" class="nav-item nav-link active">Recipes</a>
+                <a href="planner.html" class="nav-item nav-link active">Planner</a>
+            </div>
+            <div class="d-none d-lg-flex ms-2">
+                <a class="btn-sm-square bg-white rounded-circle ms-3" id="logout-btn" href="#">
+                    <small class="fa fa-sign-out-alt text-body"></small>
+                </a>
+            </div>
+        </div>
+    </nav>
+    <!-- Navbar End -->
+
+    <!-- Dashboard Content Start -->
+    <div class="container-fluid mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-12 dashboard-content">
+                <h3 class="card-title text-center text-primary mb-4">Welcome to Your Dashboard, <span id="username"></span>!</h3>
+                <p class="text-center">Here you can view your account details, manage your recipes, and more!</p>
+
+                <!-- User Information -->
+                <div class="mb-3">
+                    <h4>Your Information:</h4>
+                    <p><strong>Username:</strong> <span id="user-info-username"></span></p>
+                    <p><strong>Email:</strong> <span id="user-info-email"></span></p>
+                </div>
+
+                <!-- Username Edit Section (Visible for non-admin users) -->
+                <div id="edit-username-section" style="display:none;" class="mt-4">
+                    <h4>Edit Your Username</h4>
+                    <form id="update-username-form">
+                        <div class="form-group mb-2">
+                            <input type="text" id="new-username" class="form-control" required>
+                            <button type="submit" class="btn btn-primary">Update Username</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Dashboard Options for All Users -->
+                <div class="text-center">
+                    <a href="recipes.html" class="btn btn-primary">View Recipes</a>
+                    <a href="planner.html" class="btn btn-secondary">Go to Planner</a>
+                </div>
+
+                <!-- Admin CRUD Table (Hidden for non-admin users) -->
+                <div id="admin-crud" style="display:none;" class="mt-4">
+                    <h4>Admin Recipe Management</h4>
+                    <button class="btn btn-success mb-3" id="add-button">Add New Recipe</button>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Ingredients</th>
+                                    <th>Serving Size</th>
+                                    <th>Servings</th>
+                                    <th>Steps</th>
+                                    <th>Tags</th>
+                                    <th>Search Terms</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipe-table-body">
+                                <!-- Recipes will be dynamically loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <button type="button" id="btn_prev">Prev</button>
+                <button type="button" id="btn_next">Next</button>
+                page: <span id="page"></span>
+            </div>
+        </div>
+    </div>
+    <!-- Dashboard Content End -->
+
+    <!-- Dark Overlay -->
+    <div id="overlay"></div>
+
+    <!-- Recipe Form Modal (Centered in the middle of the screen) -->
+    <div id="recipeFormModal">
+        <h4>Recipe Form</h4>
+        <form id="recipeForm">
+            <input type="hidden" id="recipeId" value="">
+            <div class="form-group mb-2">
+                <label for="recipeName">Name</label>
+                <input type="text" id="recipeName" class="form-control" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeDescription">Description</label>
+                <textarea id="recipeDescription" class="form-control" required></textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeIngredients">Ingredients</label>
+                <textarea id="recipeIngredients" class="form-control" required></textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeIngredientsRaw">Ingredients (Raw)</label>
+                <textarea id="recipeIngredientsRaw" class="form-control" required></textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeServingSize">Serving Size</label>
+                <input type="text" id="recipeServingSize" class="form-control">
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeServings">Servings</label>
+                <input type="number" id="recipeServings" class="form-control" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeSteps">Steps</label>
+                <textarea id="recipeSteps" class="form-control" required></textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeTags">Tags</label>
+                <input type="text" id="recipeTags" class="form-control">
+            </div>
+            <div class="form-group mb-2">
+                <label for="recipeSearchTerms">Search Terms</label>
+                <input type="text" id="recipeSearchTerms" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Recipe</button>
+            <button type="button" class="btn btn-secondary" id="cancel-button" onclick="closeRecipeForm()">Cancel</button>
+        </form>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="text/JavaScript" src = "js/dashboard.js"></script>
+    <script src="js/main.js"></script>
+
+</body>
+
+</html>
