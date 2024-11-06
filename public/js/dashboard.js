@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 for (var i = (page-1) * records_per_page; i < (page * records_per_page) && i < recipes.length; i++){
                     const row = document.createElement('tr');
                     row.innerHTML = 
-                        `<td>${recipes[i].recipe_id}</td>
+                        `<td>${recipes[i]._id}</td>
                         <td>${recipes[i].name}</td>
                         <td>${recipes[i].description}</td>
                         <td>${recipes[i].ingredients}</td>
@@ -93,8 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td>${recipes[i].tags}</td>
                         <td>${recipes[i].search_terms}</td>
                         <td>
-                            <button class="btn btn-warning btn-sm edit-button" data-recipe-id="${recipes[i].recipe_id}">Edit</button>
-                            <button class="btn btn-danger btn-sm delete-button" data-recipe-id="${recipes[i].recipe_id}">Delete</button>
+                            <button class="btn btn-warning btn-sm edit-button" data-recipe-id="${recipes[i]._id}">Edit</button>
+                            <button class="btn btn-danger btn-sm delete-button" data-recipe-id="${recipes[i]._id}">Delete</button>
                         </td>`;
                     recipeTableBody.appendChild(row);
                 }
@@ -119,6 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.querySelectorAll('.edit-button').forEach(button => {
                     button.addEventListener('click', function() {
                         const recipeId = this.getAttribute('data-recipe-id');
+                        console.log(recipeId, "RAHHH");
                         editRecipe(recipeId);
                     });
                 });
@@ -172,7 +173,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('overlay').style.display = 'block'; // Show overlay
         document.getElementById('recipeFormModal').style.display = 'block'; // Show the form
         if (recipe) {
-            document.getElementById('recipeId').value = recipe.recipe_id;
+            console.log(recipe, "recipe");
+            document.getElementById('recipeId').value = recipe._id;
             document.getElementById('recipeName').value = recipe.name;
             document.getElementById('recipeDescription').value = recipe.description;
             document.getElementById('recipeIngredients').value = recipe.ingredients;

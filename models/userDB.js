@@ -36,7 +36,6 @@ class UserDB {
     
 
     async addUser(request, respond) {
-        console.log("Calls here");
         try {
             const db = await connectToDatabase();
 

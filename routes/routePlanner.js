@@ -19,8 +19,13 @@ function routePlanner(app) {
    app.route('/plannersUser/:user_id')
        .get(plannerDBObject.getPlanByUserId);
     
-    app.route('/plannersGroup/:id')
-        .get(plannerDBObject.getPlansGroupedByDate);
+       app.route('/plannersGroup/:id')
+       .get((req, res, next) => {
+           console.log('Route /plannersGroup/:id is hit');
+           next();  
+       })
+       .get(plannerDBObject.getGroupedPlans);
+   
 }
 
 module.exports = { routePlanner };

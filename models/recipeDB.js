@@ -98,7 +98,6 @@ class RecipeDB {
     async getRecipeById(request, respond) {
         try {
             const db = await connectToDatabase();
-            console.log("Database connected:", db);
     
             const recipeId = request.params.id;
 

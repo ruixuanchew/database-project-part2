@@ -68,7 +68,6 @@ class NutritionDB {
                     }
                 }
             ]).toArray();
-            console.log("Nutrition Data:", nutritionData);
             
             if (nutritionData.length > 0) {
                 respond.json(nutritionData);

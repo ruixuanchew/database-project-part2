@@ -9,6 +9,7 @@ const currentDayElem = document.getElementById('currentDay');
 
 let currentUser;
 let totalCalories = 0;
+let totalCals = 0;
 let caloriesCalculated = false;
 
 // Function to update the displayed current day
@@ -419,6 +420,7 @@ function populateRecipeDropdown(recipes) {
 function removeCalories(id) {
     const matchedPlan = plansArr.find(plan => plan._id === id);
     const recipeId = matchedPlan.recipe_id; // Get the recipe_id from the matched plan
+    let tempCalories = 0;
 
     if (!matchedPlan) {
         console.error('Plan not found for the given planner_id:', id);
@@ -443,13 +445,16 @@ function removeCalories(id) {
                 .then(nutrition => {
                     if (nutrition.length > 0) {
                         nutrition.forEach(item => {
-                            totalCalories -= parseInt(item.calories); // Decrement calories
+                            console.log(item.nutrition.calories, 'Nutrition calories Remover');
+                            tempCalories += parseInt(item.nutrition.calories); // Decrement calories
                         });
                     } else {
                         console.error(`No nutritional data found for recipe ID ${recipeId}.`);
                     }
                     
                     const caloriesElement = document.getElementById('total-calories');
+                    totalCalories -= tempCalories;
+                    console.log(totalCalories, "After");
                     caloriesElement.textContent = totalCalories;
                 })
                 .catch(error => {
@@ -457,68 +462,68 @@ function removeCalories(id) {
                 });
         })
         .catch(error => console.error('Error fetching recipe details:', error));
-}
-
-// Add calories
-function addCalories(){
-    console.log("Call this");
-    const recipeId = selectedRecipeId;
-    if (!recipeId) {
-        console.error('No recipe ID found in the URL');
-        return;
     }
-    // Fetch the recipe details from your server using the recipe ID
-    fetch(`/recipes/${recipeId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Recipe not found');
-            }
-            return response.json();
-        })
-        .then(recipe => {
-             //Fetch nutrition value for each ingridient in recipe
-            fetch(`/nutritions/${recipeId}`)
+
+    function addCalories() {
+        console.log("Called addCalories");
+        let tempCalories = 0;  // Local variable for temporary accumulation
+        const recipeId = selectedRecipeId;
+
+        if (!recipeId) {
+            console.error('No recipe ID found');
+            return;
+        }
+
+        fetch(`/recipes/${recipeId}`)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Nutritional data for ${recipe} not found`);
+                    throw new Error('Recipe not found');
+                }
+                return response.json();
+            })
+            .then(recipe => {
+                return fetch(`/nutritions/${recipeId}`);
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Nutritional data for recipe ID ${recipeId} not found`);
                 }
                 return response.json();
             })
             .then(nutrition => {
-                for(let i = 0; i<nutrition.length; i++){
-                    console.log(nutrition, 'nutrition');
-                    totalCalories += parseInt(nutrition[i].calories); // Increment calories
-                }
-                const calories = document.getElementById('total-calories');
-                calories.textContent = totalCalories;
-            })
-            .catch(error => {
-                console.error(`Error fetching nutrition data for ${recipe}:`, error);
-            });
-        })
-        .catch(error => console.error('Error fetching recipe details:', error));
-}
+                nutrition.forEach(item => {
+                    console.log(item.nutrition.calories, 'Nutrition calories');
+                    tempCalories += parseFloat(item.nutrition.calories); // Accumulate locally
+                });
 
-// Calculate calories based on type and ID
-function calculateCalories(id, type) {
-    if(id != null && type == 'update'){
-        removeCalories(id); // Remove first
-        addCalories(); // Add calories 
+                console.log(tempCalories, "Total calories for current calculation");
+                totalCalories += tempCalories;  // Update global variable once
+                document.getElementById('total-calories').textContent = totalCalories;
+            })
+            .catch(error => console.error('Error fetching data:', error));
     }
-    else if(id != null && type == 'delete'){
-        removeCalories(id);
+
+    // Calculate calories based on type and ID
+    function calculateCalories(id, type) {
+        if(id != null && type == 'update'){
+            removeCalories(id); // Remove first
+            addCalories(); // Add calories 
+        }
+        else if(id != null && type == 'delete'){
+            removeCalories(id);
+        }
+        else if(id == null && type == 'add'){
+            addCalories();
+        }
     }
-    else if(id == null && type == 'add'){
-        addCalories();
-    }
-}
 
 function displayRecipeDetails() {
     // Reset totalCalories for the new calculation
-    totalCalories = 0;
-
+    let tempCalories = 0;
+    // totalCalories = tempCalories;
     // Get the current date string to match with plansArr
     const currentDateString = currentDayElem.textContent;
+    console.log("Hi");
 
     // Filter plansArr to only include the plans for the current date
     const todayPlans = plansArr.filter(plan => plan.date === currentDateString);
@@ -537,7 +542,9 @@ function displayRecipeDetails() {
             })
             .then(nutrition => {
                 nutrition.forEach(item => {
-                    totalCalories += parseInt(item.calories);
+                    tempCalories += parseInt(item.nutrition.calories);
+                    totalCalories = tempCalories;
+                    console.log(totalCalories, 'run');
                 });
 
                 // Update the total calories display
@@ -556,32 +563,32 @@ function displayRecipeDetails() {
     }
 }
 
-// Calculate meals by grouping same day count of plans
 function calculateTotalMeals() {
     fetch(`/plannersGroup/${currentUser}`)
-        .then(response => {
-            if (!response.ok) {
-                if (response.status === 404) {
-                    return []; 
-                }
-                throw new Error('Failed to fetch plans'); 
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 404) {
+                return []; 
             }
-            return response.json(); 
-        })
-        .then(plans => {
-            const mealElem = document.getElementById('total-meal');
-            const currentDateDisplayed = currentDayElem ? currentDayElem.textContent : '';
+            throw new Error('Failed to fetch plans'); 
+        }
+        return response.json(); 
+    })
+    .then(plans => {
+        const mealElem = document.getElementById('total-meal');
+        const currentDateDisplayed = currentDayElem ? currentDayElem.textContent : '';
 
-            if (!mealElem || !currentDateDisplayed) {
-                console.error('Error: Meal element or current date is not defined.');
-                return;
-            }
+        if (!mealElem || !currentDateDisplayed) {
+            console.error('Error: Meal element or current date is not defined.');
+            return;
+        }
 
-            const mealsToday = plans.find(plan => plan.date === currentDateDisplayed);
+        const mealsToday = plans.find(plan => plan.date === currentDateDisplayed);
 
-            mealElem.textContent = mealsToday ? mealsToday.total_plans : 0;
-        })
-        .catch(error => console.error('Error fetching plans:', error));
+        mealElem.textContent = mealsToday ? mealsToday.total_plans : 0;
+    })
+    .catch(error => console.error('Error fetching plans:', error));
+
 }
 
 // Initialize the app

@@ -64,55 +64,30 @@ class PlannerDB {
             console.error('Error fetching plans by date:', error);
             respond.status(500).json({ error: error.message });
         }
-    }
-    
-    // Count the total plans in different dates
-    // getPlansGroupedByDate(request, respond) {
-    //     const userId = request.params.id;
-    //     const sql = `
-    //         SELECT 
-    //             date, 
-    //             COUNT(*) AS total_plans 
-    //         FROM planners
-    //         WHERE user_id = ?
-    //         GROUP BY date;
-    //     `;
-    
-    //     db.query(sql, [userId], (error, result) => {
-    //         if (error) {
-    //             return respond.status(500).json({ error: error.message });
-    //         }
-    //         respond.json(result);
-    //     });
-    // }
-    // Count the total plans in different dates
-    async getPlansGroupedByDate(request, respond) {
+    }    
+
+    // Get group plans 
+    async getGroupedPlans(request, respond) {
         try {
+            const db = await connectToDatabase();
             const userId = request.params.id;
-            const userIdObject = new ObjectId(userId); 
-
-            const db = await connectToDatabase();  // Assuming connectToDatabase is a function that connects to MongoDB
-
-            const result = await db.collection('planners').aggregate([
-                { $match: { user_id: userIdObject } },  // Filter by user ID
-                { $group: { 
-                    _id: "$date", 
-                    total_plans: { $sum: 1 } 
-                }},
-                { $project: { 
-                    date: "$_id", 
-                    total_plans: 1, 
-                    _id: 0 
-                }}
-            ]).toArray();
+    
+            console.log("Request User ID:", userId);
+    
+            const pipeline = [
+                { $match: { user_id: userId } },
+                { $group: { _id: "$date", total_plans: { $sum: 1 } } },
+                { $project: { date: "$_id", total_plans: 1, _id: 0 } }
+            ];
+    
+            const result = await db.collection('planners').aggregate(pipeline).toArray();
 
             respond.json(result);
         } catch (error) {
-            console.error("Error counting plans by date:", error);
+            console.error('Error fetching plans grouped by date:', error);
             respond.status(500).json({ error: error.message });
         }
     }
-
 
     // Add plans
     async addPlan(request, respond) {
@@ -139,7 +114,6 @@ class PlannerDB {
     
             // Only respond once
             respond.json(result);
-            console.log('Plan added successfully'); // Avoid sending another response here
         } catch (error) {
             // Only respond with an error if no response was sent
             console.error("Database insertion error:", error);
