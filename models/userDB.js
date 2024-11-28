@@ -36,9 +36,10 @@ class UserDB {
     
 
     async addUser(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
-
+            session.startTransaction(); 
             const existingUser = await db.collection('users').findOne({
                 $or: [
                     { email: request.body.email },
@@ -68,16 +69,22 @@ class UserDB {
                 password: userObject.getPassword()
             });
             respond.json({ success: true, message: "User registered successfully", result });
+            await session.commitTransaction();
         } catch (error) {
             respond.status(500).json({ success: false, message: "Database insertion error", error: error.message });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
         }
     }
     
     async updateUser(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
             const userId = request.params.id;
             const newUsername = request.body.username;
+            session.startTransaction(); 
     
             // Convert userId to an ObjectId for MongoDB
             const objectId = new ObjectId(userId);
@@ -93,22 +100,34 @@ class UserDB {
             }
     
             respond.status(200).json({ success: true, message: 'User updated successfully', result });
+            await session.commitTransaction();
         } catch (error) {
             console.error("Error updating user:", error);
             respond.status(500).json({ success: false, message: 'Database update error', error: error.message });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
         }
     }
 
-    deleteUser(request, respond) {
-        const userId = request.params.id;
-        const sql = "DELETE FROM users WHERE user_id = ?";
+    async deleteUser(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
+        try{
+            const userId = request.params.id;
+            const objectId = new ObjectId(userId);
+            session.startTransaction(); 
 
-        db.query(sql, userId, (error, result) => {
-            if (error) {
-                throw error;
-            }
+            const result = await db.collection('users').deleteOne({ _id: objectId });
             respond.json(result);
-        });
+            await session.commitTransaction();
+        }catch (error) {
+            console.error("Database deletion error:", error);
+            respond.status(500).json({ error: "Database deletion error" });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
+        }
     }
 }
 

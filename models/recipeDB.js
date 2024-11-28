@@ -238,8 +238,10 @@ class RecipeDB {
     }
 
     async addRecipe(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
+            session.startTransaction();
             const recipeObject = new Recipe(
                 null,
                 request.body.name,
@@ -253,8 +255,6 @@ class RecipeDB {
                 request.body.search_terms
             );
 
-            console.log("Adding new recipe:", recipeObject);
-
             const result = await db.collection('recipes').insertOne({
                 name: recipeObject.getName(),
                 description: recipeObject.getDescription(),
@@ -266,24 +266,27 @@ class RecipeDB {
                 tags: recipeObject.getTags(),
                 search_terms: recipeObject.getSearchTerms()
             });
-
-            console.log("Recipe added with ID:", result.insertedId);
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
-            console.error("Error adding recipe:", error);
             respond.status(500).json({ error: "Database insertion error" });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
         }
     }
 
     async updateRecipe(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
+            session.startTransaction();
             const recipeId = request.params.id;
 
-            console.log("Updating recipe with ID:", recipeId);
-
+            const objectId = new ObjectId(recipeId); 
+            
             const recipeObject = new Recipe(
-                recipeId,
+                objectId,
                 request.body.name,
                 request.body.description,
                 request.body.ingredients,
@@ -296,7 +299,7 @@ class RecipeDB {
             );
 
             const result = await db.collection('recipes').updateOne(
-                { _id: new ObjectId(recipeId) },
+                { _id: objectId},
                 {
                     $set: {
                         name: recipeObject.getName(),
@@ -311,29 +314,34 @@ class RecipeDB {
                     }
                 }
             );
-
-            console.log("Recipe update result:", result);
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
-            console.error("Error updating recipe:", error);
+            console.error("Database update error:", error);
             respond.status(500).json({ error: "Database update error" });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
         }
     }
 
     async deleteRecipe(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
             const recipeId = request.params.id;
-
-            console.log("Deleting recipe with ID:", recipeId);
-
-            const result = await db.collection('recipes').deleteOne({ _id: new ObjectId(recipeId) });
-
-            console.log("Recipe deletion result:", result);
+            const objectId = new ObjectId(recipeId);
+            session.startTransaction(); 
+            
+            const result = await db.collection('recipes').deleteOne({ _id: objectId });
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
-            console.error("Error deleting recipe:", error);
+            console.error("Database deletion error:", error);
             respond.status(500).json({ error: "Database deletion error" });
+            await session.abortTransaction();
+        }finally {
+            session.endSession();
         }
     }
 }

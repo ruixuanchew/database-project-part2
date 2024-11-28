@@ -91,8 +91,11 @@ class PlannerDB {
 
     // Add plans
     async addPlan(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
+            session.startTransaction();
+            // Your operations here
             const plannerObject = new Planner(
                 null,
                 request.body.user_id,
@@ -102,7 +105,6 @@ class PlannerDB {
                 request.body.time,
                 request.body.date
             );
-    
             const result = await db.collection('planners').insertOne({
                 user_id: plannerObject.getUserId(),
                 recipe_id: plannerObject.getRecipeId(),
@@ -111,24 +113,24 @@ class PlannerDB {
                 time: plannerObject.getTime(),
                 date: plannerObject.getDate(),
             });
-    
-            // Only respond once
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
-            // Only respond with an error if no response was sent
             console.error("Database insertion error:", error);
+            await session.abortTransaction();
             if (!respond.headersSent) {  // Check if headers are already sent
                 respond.status(500).json({ error: "Database insertion error" });
             }
+        } finally {
+            session.endSession();
         }
     }
-    
 
     // Update Plans
     async updatePlan(request, respond) {
-        const db = await connectToDatabase();
         const plannerId = request.params.id;
         const objectId = new ObjectId(plannerId); 
+
 
         const fieldsToUpdate = {};
 
@@ -141,31 +143,42 @@ class PlannerDB {
         if (Object.keys(fieldsToUpdate).length === 0) {
             return respond.status(400).json({ message: "No fields to update" });
         }
-
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
+            session.startTransaction();
             const result = await db.collection('planners').updateOne(
                 { _id: objectId },
                 { $set: fieldsToUpdate }
             );
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
-            console.error('Error updating plan:', error);
-            respond.status(500).json({ error: error.message });
+            console.error("Database update error:", error);
+            await session.abortTransaction();
+            respond.status(500).json({ error: "Database update error" });
+        } finally {
+            session.endSession();
         }
     }
 
     // Delete plans
     async deletePlan(request, respond) {
+        const db = await connectToDatabase();
+        const session = db.client.startSession();
         try {
-            const db = await connectToDatabase();
             const plannerId = request.params.id;
             const objectId = new ObjectId(plannerId); 
-            
+            session.startTransaction();
             const result = await db.collection('planners').deleteOne({ _id: objectId });
             respond.json(result);
+            await session.commitTransaction();
         } catch (error) {
             console.error("Database deletion error:", error);
+            await session.abortTransaction();
             respond.status(500).json({ error: "Database deletion error" });
+        }finally {
+            session.endSession();
         }
     }
 
