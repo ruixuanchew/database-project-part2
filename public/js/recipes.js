@@ -2,6 +2,7 @@ let recipes = [];
 const recipesPerPage = 20;
 let currentPage = 1;
 let activeFilters = []; // To store search terms for dynamic filters
+let lastFilters = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     // On page load, check if the URL contains a page number and a query
@@ -115,16 +116,39 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function getRecipes() {
-    fetch('/recipes')
+    const urlParams = new URLSearchParams(window.location.search);
+    const sortBy = urlParams.get('sortBy') || null; // Get sortBy from URL
+    const sortDirection = urlParams.get('sortDirection') || null; // Get sortDirection from URL
+    const query = urlParams.get('query') || null; // Get search query from URL
+    const filters = urlParams.getAll('filters'); // Get filters from URL
+    const page = currentPage || 1; // Ensure the current page is set
+    const limit = recipesPerPage || 20; // Set the limit to 20 by default
+
+    // Fetch sorted and/or filtered recipes based on query and sort parameters
+    let fetchUrl = `/recipes`;
+    if (query) {
+        fetchUrl += `?query=${encodeURIComponent(query)}`;
+    }
+    if (sortBy) {
+        fetchUrl += `${query ? '&' : '?'}sortBy=${sortBy}&sortDirection=${sortDirection}`;
+    }
+    if (filters.length > 0) {
+        fetchUrl += `${sortBy || query ? '&' : '?'}filters=${filters.join(',')}`;
+    }
+
+    // Log the fetch URL to see the constructed request
+    console.log('Fetching recipes from URL:', fetchUrl);
+
+    fetch(fetchUrl)
         .then(response => response.json())
         .then(data => {
             recipes = data; // Store fetched recipes
-            displayRecipes(currentPage);
-            setupPagination();
+            displayRecipes(currentPage); // Display them on the page
+            setupPagination(); // Setup pagination
+            updateFilterOptions(recipes, filters);
         })
         .catch(error => console.error('Error fetching recipes:', error));
 }
-
 
 function displayRecipes(page) {
     const list = document.getElementById('recipeContainer');
@@ -283,10 +307,14 @@ function updateFilterOptions(recipes, filters) {
     });
 
     // Retain checked state for filters from URL
-    filters.forEach(filter => {
+    const filtersUsed = recipes.length > 0 ? filters : lastFilters;
+    filtersUsed.forEach(filter => {
         const checkbox = document.querySelector(`.filter-checkbox[value="${filter}"]`);
         if (checkbox) checkbox.checked = true;
     });
+
+    // Update lastFilters for the next iteration
+    lastFilters = sortedTerms;
 }
 
 // Function to populate filter menu based on searched recipes
