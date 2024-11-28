@@ -26,11 +26,12 @@ class RecipeDB {
             const sortBy = request.query.sortBy || 'recipe_id';
             const sortDirection = request.query.sortDirection === 'DESC' ? -1 : 1;
             const page = parseInt(request.query.page) || 1;
-            const limit = parseInt(request.params.limit) || 20;
+            const limit = parseInt(request.query.limit) || 20;
             const offset = (page - 1) * limit;
 
             const query = {};
 
+            // Apply search query filtering
             if (searchQuery) {
                 query.$or = [
                     { name: { $regex: searchQuery, $options: 'i' } },
@@ -38,6 +39,7 @@ class RecipeDB {
                 ];
             }
 
+            // Apply additional filters
             if (filters.length) {
                 query.$and = filters.map(filter => ({
                     search_terms: { $regex: filter, $options: 'i' }
@@ -46,60 +48,42 @@ class RecipeDB {
 
             console.log("Constructed MongoDB Query:", JSON.stringify(query, null, 2));
 
-            const pipeline = [];
+            // Build the aggregation pipeline
+            const pipeline = [
+                { $match: query }, // First, filter the recipes based on the search query
+            ];
 
-            // Match stage for filters and search (if applicable)
-            if (Object.keys(query).length > 0) {
-                pipeline.push({ $match: query });
-            }
-
-            // Add a derived field 'serving_mass' from the 'serving_size' field (assuming format "1 (155 g)")
-            pipeline.push({
-                $addFields: {
-                    serving_mass: {
-                        $cond: {
-                            if: {
-                                $regexMatch: {
-                                    input: "$serving_size",
-                                    regex: "^\\d+\\s*\\(\\d+\\s*g\\)$" // Ensure format like "1 (155 g)"
-                                }
-                            },
-                            then: {
-                                $toInt: {
-                                    $trim: {
-                                        input: {
-                                            $arrayElemAt: [
-                                                { $split: [{ $arrayElemAt: [{ $split: ["$serving_size", "("] }, 1] }, "g"] },
-                                                0
-                                            ]
-                                        }
+            // Add sorting logic
+            if (sortBy === 'name') {
+                pipeline.push({
+                    $addFields: {
+                        normalized_name: { $toLower: "$name" } // Normalize the name for case-insensitive sorting
+                    }
+                });
+                pipeline.push({ $sort: { normalized_name: sortDirection } }); // Sort by normalized_name
+            } else if (sortBy === 'serving_size') {
+                pipeline.push({
+                    $addFields: {
+                        serving_mass: {
+                            $toInt: {
+                                $trim: {
+                                    input: {
+                                        $arrayElemAt: [
+                                            { $split: [{ $arrayElemAt: [{ $split: ["$serving_size", "("] }, 1] }, "g"] },
+                                            0
+                                        ]
                                     }
                                 }
-                            },
-                            else: null
+                            }
                         }
                     }
-                }
-            });
-
-            // Sort based on serving_mass or another field (if `sortBy` is 'serving_size')
-            if (sortBy === 'serving_size') {
-                pipeline.push({
-                    $sort: {
-                        serving_mass: sortDirection === 'ASC' ? 1 : -1, // Ascending or descending sort based on serving_mass
-                        _id: 1 // Tie-breaker for consistent sorting (optional)
-                    }
                 });
+                pipeline.push({ $sort: { serving_mass: sortDirection } }); // Sort by serving_mass
             } else {
-                pipeline.push({
-                    $sort: {
-                        [sortBy]: sortDirection === 'ASC' ? 1 : -1, // Sort by any other field specified in `sortBy`
-                        _id: 1 // Tie-breaker for consistent sorting
-                    }
-                });
+                pipeline.push({ $sort: { [sortBy]: sortDirection } }); // Sort by specified field
             }
 
-            // // Pagination stages
+            // // Add pagination stages
             // pipeline.push({ $skip: offset });
             // pipeline.push({ $limit: limit });
 
@@ -111,7 +95,6 @@ class RecipeDB {
             console.log("Search Query:", searchQuery);
             console.log("Filters Applied:", filters);
             console.log("Sort By:", sortBy, "Sort Direction:", sortDirection);
-            console.log("Query Object:", JSON.stringify(query, null, 2));
             console.log("Fetched recipes count:", recipes.length);
 
             respond.json(recipes);
@@ -164,15 +147,21 @@ class RecipeDB {
 
             console.log("Constructed MongoDB Query:", JSON.stringify(query, null, 2));
 
-            const pipeline = [];
+            // Build the aggregation pipeline
+            const pipeline = [
+                { $match: query }, // First, filter the recipes based on the search query
+            ];
 
-            // Match stage for filters and search (if applicable)
-            if (query) {
-                pipeline.push({ $match: query });
-            }
-
-            // Sort based on serving_mass or other fields
-            if (sortBy === 'serving_size') {
+            // Add sorting logic
+            // Add sorting logic
+            if (sortBy === 'name') {
+                pipeline.push({
+                    $addFields: {
+                        normalized_name: { $toLower: "$name" } // Normalize the name for case-insensitive sorting
+                    }
+                });
+                pipeline.push({ $sort: { normalized_name: sortDirection } }); // Sort by normalized_name
+            } else if (sortBy === 'serving_size') {
                 pipeline.push({
                     $addFields: {
                         serving_mass: {
@@ -189,14 +178,10 @@ class RecipeDB {
                         }
                     }
                 });
-                pipeline.push({ $sort: { serving_mass: sortDirection } });
+                pipeline.push({ $sort: { serving_mass: sortDirection } }); // Sort by serving_mass
             } else {
-                pipeline.push({ $sort: { [sortBy]: sortDirection } });
+                pipeline.push({ $sort: { [sortBy]: sortDirection } }); // Sort by specified field
             }
-
-            // // Pagination stages
-            // pipeline.push({ $skip: offset });
-            // pipeline.push({ $limit: limit });
 
             console.log("Executing MongoDB Pipeline:", JSON.stringify(pipeline, null, 2));
 

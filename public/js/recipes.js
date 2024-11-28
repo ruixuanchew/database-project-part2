@@ -125,7 +125,7 @@ function getRecipes() {
     const limit = recipesPerPage || 20; // Set the limit to 20 by default
 
     // Fetch sorted and/or filtered recipes based on query and sort parameters
-    let fetchUrl = `/recipes`;
+    let fetchUrl = `/recipes/sorted/${page}/${limit}`;
     if (query) {
         fetchUrl += `?query=${encodeURIComponent(query)}`;
     }
