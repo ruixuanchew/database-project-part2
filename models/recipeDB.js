@@ -5,6 +5,28 @@ const { ObjectId } = require('mongodb');
 const Recipe = require('./recipe');
 
 class RecipeDB {
+    async ensureIndexes() {
+        try {
+            const db = await connectToDatabase();
+    
+            // Create index on `name` and `search_terms` fields
+            // Ignore "Index already exists" errors by wrapping in try-catch
+            await Promise.all([
+                db.collection('recipes').createIndex({ name: 1 }, { name: "name_1" }),
+                db.collection('recipes').createIndex({ search_terms: 1 }, { name: "search_terms_1" }),
+            ]);
+    
+            console.log("Indexes ensured successfully.");
+        } catch (error) {
+            if (error.codeName === "IndexOptionsConflict" || error.message.includes("Index already exists")) {
+                console.log("Indexes already exist, skipping creation.");
+            } else {
+                console.error("Error ensuring indexes:", error);
+                throw error; // Rethrow if it's a different error
+            }
+        }
+    }    
+
     async getAllRecipes(request, respond) {
         try {
             const db = await connectToDatabase();
@@ -25,28 +47,31 @@ class RecipeDB {
             const filters = request.query.filters ? request.query.filters.split(',').map(f => f.toLowerCase()) : [];
             const sortBy = request.query.sortBy || 'recipe_id';
             const sortDirection = request.query.sortDirection === 'DESC' ? -1 : 1;
-            const page = parseInt(request.query.page) || 1;
-            const limit = parseInt(request.query.limit) || 20;
-            const offset = (page - 1) * limit;
 
             const query = {};
 
+            // Initialize a single $or array
+            const orConditions = [];
+
             // Apply search query filtering
             if (searchQuery) {
-                query.$or = [
+                orConditions.push(
                     { name: { $regex: searchQuery, $options: 'i' } },
                     { search_terms: { $regex: searchQuery, $options: 'i' } }
-                ];
+                );
             }
 
-            // Apply additional filters
+            // Apply additional filters and combine with search terms
             if (filters.length) {
-                query.$and = filters.map(filter => ({
-                    search_terms: { $regex: filter, $options: 'i' }
-                }));
+                filters.forEach(filter => {
+                    orConditions.push({ search_terms: { $regex: filter, $options: 'i' } });
+                });
             }
 
-            console.log("Constructed MongoDB Query:", JSON.stringify(query, null, 2));
+            // If there are any conditions in $or, apply them
+            if (orConditions.length > 0) {
+                query.$or = orConditions;
+            }
 
             // Build the aggregation pipeline
             const pipeline = [
@@ -83,19 +108,8 @@ class RecipeDB {
                 pipeline.push({ $sort: { [sortBy]: sortDirection } }); // Sort by specified field
             }
 
-            // // Add pagination stages
-            // pipeline.push({ $skip: offset });
-            // pipeline.push({ $limit: limit });
-
-            console.log("Executing MongoDB Pipeline:", JSON.stringify(pipeline, null, 2));
-
             // Execute the aggregation pipeline
             const recipes = await db.collection('recipes').aggregate(pipeline).toArray();
-
-            console.log("Search Query:", searchQuery);
-            console.log("Filters Applied:", filters);
-            console.log("Sort By:", sortBy, "Sort Direction:", sortDirection);
-            console.log("Fetched recipes count:", recipes.length);
 
             respond.json(recipes);
         } catch (error) {
@@ -126,33 +140,37 @@ class RecipeDB {
             const filters = request.query.filters ? request.query.filters.split(',').map(f => f.toLowerCase()) : [];
             const sortBy = request.query.sortBy || 'recipe_id';
             const sortDirection = request.query.sortDirection === 'DESC' ? -1 : 1;
-            const page = parseInt(request.query.page) || 1;
-            const limit = parseInt(request.params.limit) || 20;
-            const offset = (page - 1) * limit;
 
             const query = {};
 
+            // Initialize a single $or array
+            const orConditions = [];
+
+            // Apply search query filtering
             if (searchQuery) {
-                query.$or = [
+                orConditions.push(
                     { name: { $regex: searchQuery, $options: 'i' } },
                     { search_terms: { $regex: searchQuery, $options: 'i' } }
-                ];
+                );
             }
 
+            // Apply additional filters and combine with search terms
             if (filters.length) {
-                query.$and = filters.map(filter => ({
-                    search_terms: { $regex: filter, $options: 'i' }
-                }));
+                filters.forEach(filter => {
+                    orConditions.push({ search_terms: { $regex: filter, $options: 'i' } });
+                });
             }
 
-            console.log("Constructed MongoDB Query:", JSON.stringify(query, null, 2));
+            // If there are any conditions in $or, apply them
+            if (orConditions.length > 0) {
+                query.$or = orConditions;
+            }
 
             // Build the aggregation pipeline
             const pipeline = [
                 { $match: query }, // First, filter the recipes based on the search query
             ];
 
-            // Add sorting logic
             // Add sorting logic
             if (sortBy === 'name') {
                 pipeline.push({
@@ -183,16 +201,13 @@ class RecipeDB {
                 pipeline.push({ $sort: { [sortBy]: sortDirection } }); // Sort by specified field
             }
 
-            console.log("Executing MongoDB Pipeline:", JSON.stringify(pipeline, null, 2));
-
             // Execute the aggregation pipeline
             const recipes = await db.collection('recipes').aggregate(pipeline).toArray();
 
             console.log("Search Query:", searchQuery);
             console.log("Filters Applied:", filters);
             console.log("Sort By:", sortBy, "Sort Direction:", sortDirection);
-            console.log("Query Object:", JSON.stringify(query, null, 2));
-            console.log("Fetched recipes count:", recipes.length);
+            console.log("Fetched recipes count:", recipes.length)
 
             respond.json(recipes);
         } catch (error) {
@@ -256,77 +271,48 @@ class RecipeDB {
         } catch (error) {
             respond.status(500).json({ error: "Database insertion error" });
             await session.abortTransaction();
-        }finally {
+        } finally {
             session.endSession();
         }
     }
 
     async updateRecipe(request, respond) {
-        const db = await connectToDatabase();
-        const session = db.client.startSession();
         try {
-            session.startTransaction();
+            const db = await connectToDatabase();
             const recipeId = request.params.id;
-
-            const objectId = new ObjectId(recipeId); 
-            
-            const recipeObject = new Recipe(
-                objectId,
-                request.body.name,
-                request.body.description,
-                request.body.ingredients,
-                request.body.ingredients_raw,
-                request.body.serving_size,
-                request.body.servings,
-                request.body.steps,
-                request.body.tags,
-                request.body.search_terms
-            );
+            const updatedFields = request.body;
 
             const result = await db.collection('recipes').updateOne(
-                { _id: objectId},
-                {
-                    $set: {
-                        name: recipeObject.getName(),
-                        description: recipeObject.getDescription(),
-                        ingredients: recipeObject.getIngredients(),
-                        ingredients_raw: recipeObject.getIngredientsRaw(),
-                        serving_size: recipeObject.getServingSize(),
-                        servings: recipeObject.getServings(),
-                        steps: recipeObject.getSteps(),
-                        tags: recipeObject.getTags(),
-                        search_terms: recipeObject.getSearchTerms()
-                    }
-                }
+                { _id: new ObjectId(recipeId) },
+                { $set: updatedFields }
             );
-            respond.json(result);
-            await session.commitTransaction();
+
+            if (result.modifiedCount > 0) {
+                respond.json({ message: "Recipe updated successfully" });
+            } else {
+                respond.status(404).json({ message: "Recipe not found" });
+            }
         } catch (error) {
-            console.error("Database update error:", error);
+            console.error("Error updating recipe:", error);
             respond.status(500).json({ error: "Database update error" });
-            await session.abortTransaction();
-        }finally {
-            session.endSession();
         }
     }
 
     async deleteRecipe(request, respond) {
-        const db = await connectToDatabase();
-        const session = db.client.startSession();
         try {
+            const db = await connectToDatabase();
             const recipeId = request.params.id;
-            const objectId = new ObjectId(recipeId);
-            session.startTransaction(); 
-            
-            const result = await db.collection('recipes').deleteOne({ _id: objectId });
-            respond.json(result);
-            await session.commitTransaction();
+
+            const result = await db.collection('recipes').deleteOne({ _id: new ObjectId(recipeId) });
+
+            if (result.deletedCount > 0) {
+                respond.json({ message: "Recipe deleted successfully" });
+            } else {
+                respond.status(404).json({ message: "Recipe not found" });
+            }
         } catch (error) {
-            console.error("Database deletion error:", error);
+            console.error("Error deleting recipe:", error);
             respond.status(500).json({ error: "Database deletion error" });
-            await session.abortTransaction();
-        }finally {
-            session.endSession();
         }
     }
 }
