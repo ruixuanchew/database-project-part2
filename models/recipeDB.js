@@ -9,21 +9,32 @@ class RecipeDB {
         try {
             const db = await connectToDatabase();
     
-            // Create index on `name` and `search_terms` fields
-            // Ignore "Index already exists" errors by wrapping in try-catch
-            await Promise.all([
-                db.collection('recipes').createIndex({ name: 1 }, { name: "name_1" }),
-                db.collection('recipes').createIndex({ search_terms: 1 }, { name: "search_terms_1" }),
-            ]);
+            // Get the list of existing indexes in the 'recipes' collection
+            const existingIndexes = await db.collection('recipes').indexes();
     
-            console.log("Indexes ensured successfully.");
-        } catch (error) {
-            if (error.codeName === "IndexOptionsConflict" || error.message.includes("Index already exists")) {
-                console.log("Indexes already exist, skipping creation.");
+            // Check if the indexes already exist by comparing with the required ones
+            const indexExists = (indexName) => {
+                return existingIndexes.some(index => index.name === indexName);
+            };
+    
+            // Only create the indexes if they don't already exist
+            if (!indexExists("name_1")) {
+                await db.collection('recipes').createIndex({ name: 1 }, { name: "name_1" });
+                console.log("Created index 'name_1'.");
             } else {
-                console.error("Error ensuring indexes:", error);
-                throw error; // Rethrow if it's a different error
+                console.log("Index 'name_1' already exists. Skipping creation.");
             }
+    
+            if (!indexExists("search_terms_1")) {
+                await db.collection('recipes').createIndex({ search_terms: 1 }, { name: "search_terms_1" });
+                console.log("Created index 'search_terms_1'.");
+            } else {
+                console.log("Index 'search_terms_1' already exists. Skipping creation.");
+            }
+    
+        } catch (error) {
+            console.error("Error ensuring indexes:", error);
+            throw error; // Rethrow if an unexpected error occurs
         }
     }    
 
