@@ -215,11 +215,6 @@ class RecipeDB {
             // Execute the aggregation pipeline
             const recipes = await db.collection('recipes').aggregate(pipeline).toArray();
 
-            console.log("Search Query:", searchQuery);
-            console.log("Filters Applied:", filters);
-            console.log("Sort By:", sortBy, "Sort Direction:", sortDirection);
-            console.log("Fetched recipes count:", recipes.length)
-
             respond.json(recipes);
         } catch (error) {
             console.error("Error searching and sorting recipes:", error);

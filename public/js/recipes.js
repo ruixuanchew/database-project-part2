@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentPage = page; // Set the current page based on URL parameter
 
     // If filters exist in the URL, populate activeFilters
-    activeFilters = filters;
+    activeFilters = filters.length > 0 ? filters : activeFilters;
 
     if (sortBy && sortDirection) {
         // Retain the selected sort option in the dropdown
@@ -103,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         history.pushState({ sortBy, sortDirection, page: currentPage }, '', newUrl); // Update the URL without reloading
 
         getRecipes();
-
     });
 
     // Restore filters from URL and check corresponding boxes
@@ -284,9 +283,12 @@ function setupPagination() {
     }
 }
 
-function updateFilterOptions(recipes, filters) {
+function updateFilterOptions(recipes, filtersFromUrl = []) {
     const filterMenu = document.getElementById('filterMenu');
     filterMenu.innerHTML = ''; // Clear existing filter options
+
+    // Use the activeFilters array to retain the checked state
+    const appliedFilters = activeFilters.length > 0 ? activeFilters : filtersFromUrl;
 
     // Get unique search terms from the recipes and create filter options
     const searchTermSet = new Set();
@@ -302,22 +304,20 @@ function updateFilterOptions(recipes, filters) {
     // Create checkboxes for each unique, sorted search term
     sortedTerms.forEach(term => {
         const li = document.createElement('li');
-        li.innerHTML = `<a class="dropdown-item"><input type="checkbox" class="filter-checkbox" value="${term}"> ${term}</a>`;
+        const isChecked = appliedFilters.includes(term); // Check if this term is in active filters
+        li.innerHTML = `
+            <a class="dropdown-item">
+                <input type="checkbox" class="filter-checkbox" value="${term}" ${isChecked ? 'checked' : ''}> 
+                ${term}
+            </a>`;
         filterMenu.appendChild(li);
     });
 
-    // Retain checked state for filters from URL
-    const filtersUsed = recipes.length > 0 ? filters : lastFilters;
-    filtersUsed.forEach(filter => {
-        const checkbox = document.querySelector(`.filter-checkbox[value="${filter}"]`);
-        if (checkbox) checkbox.checked = true;
-    });
-
-    // Update lastFilters for the next iteration
-    lastFilters = sortedTerms;
+    // Update activeFilters to ensure it matches the URL state
+    activeFilters = appliedFilters;
 }
 
-// Function to populate filter menu based on searched recipes
+// // Function to populate filter menu based on searched recipes
 function useFilterOptions() {
     const selectedFilters = [...document.querySelectorAll('.filter-checkbox:checked')]
         .map(checkbox => checkbox.value);
